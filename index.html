@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="hu" data-theme="auto">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Megosztott Google Photos albumok gyűjteménye">
+  <title>Fotóalbumok</title>
+  <style>
+    /* ============================================================
+       SZERKESZTÉSI ÚTMUTATÓ
+       ============================================================
+       Az albumokat a <script> blokk elején az ALBUMS tömbben
+       szerkesztheted. Minden album egy objektum, a mezők:
+
+         title       – album neve (kötelező)
+         albumUrl    – Google Photos megosztási link (kötelező)
+         description – rövid leírás (opcionális)
+         date        – dátum szövegként pl. "2024. nyár" (opcionális)
+         coverUrl    – borítókép URL (opcionális; ha üres, ikon jelenik meg)
+         photoCount  – fotók száma, manuálisan (opcionális)
+
+       BORÍTÓKÉP URL MEGSZERZÉSE GOOGLE PHOTOSBÓL:
+         1. Nyisd meg a megosztott albumot
+         2. Kattints egy fotóra
+         3. Jobb klikk → „Kép megnyitása új lapon"
+         4. Azt az URL-t másold a coverUrl mezőbe
+         Tipp: az URL végéhez fűzhetsz =w800-h600 paramétert a méret szabályozásához
+
+       AZ OLDAL BEÁLLÍTÁSAI a CONFIG objektumban találhatók.
+       ============================================================ */
+
+    :root {
+      --bg:           #F7F5F2;
+      --surface:      #FFFFFF;
+      --surface-2:    #FDFCFB;
+      --accent:       #C07830;
+      --accent-soft:  rgba(192, 120, 48, 0.12);
+      --text:         #1A1714;
+      --text-muted:   #7A756F;
+      --text-light:   #B0ABA4;
+      --border:       #E8E4DF;
+      --shadow-sm:    0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md:    0 6px 20px rgba(0,0,0,0.09), 0 2px 6px rgba(0,0,0,0.05);
+      --radius:       14px;
+      --font:         -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    [data-theme="dark"] {
+      --bg:           #111111;
+      --surface:      #1C1C1E;
+      --surface-2:    #242426;
+      --accent:       #D4924A;
+      --accent-soft:  rgba(212, 146, 74, 0.14);
+      --text:         #EDEAE4;
+      --text-muted:   #8C887F;
+      --text-light:   #56524E;
+      --border:       #2C2C2E;
+      --shadow-sm:    0 1px 3px rgba(0,0,0,0.28), 0 1px 2px rgba(0,0,0,0.20);
+      --shadow-md:    0 6px 20px rgba(0,0,0,0.40), 0 2px 6px rgba(0,0,0,0.25);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      font-family: var(--font);
+      scroll-behavior: smooth;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      transition: background .25s, color .25s;
+    }
+
+    /* ── HEADER ─────────────────────────────────────────────── */
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      padding: 0 clamp(16px, 5vw, 52px);
+      transition: background .25s;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 0 10px;
+      gap: 12px;
+    }
+
+    .site-title {
+      font-size: clamp(17px, 3vw, 22px);
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      color: var(--text);
+      white-space: nowrap;
+      line-height: 1.2;
+    }
+
+    .site-title em {
+      color: var(--accent);
+      font-style: normal;
+    }
+
+    .site-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      font-weight: 500;
+      margin-top: 2px;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .icon-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      color: var(--text-muted);
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      transition: background .15s, color .15s, border-color .15s;
+      flex-shrink: 0;
+    }
+
+    .icon-btn:hover {
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    /* ── CONTROLS ──────────────────────────────────────────── */
+    .controls-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 0 14px;
+    }
+
+    .search-wrap {
+      position: relative;
+      flex: 1 1 180px;
+      max-width: 340px;
+    }
+
+    .search-wrap svg {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 9px 10px 9px 32px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 14px;
+      font-family: var(--font);
+      outline: none;
+      -webkit-appearance: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+
+    .search-input::placeholder { color: var(--text-light); }
+
+    .search-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    .sort-select {
+      padding: 9px 30px 9px 10px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 13px;
+      font-family: var(--font);
+      cursor: pointer;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      transition: border-color .15s;
+      white-space: nowrap;
+    }
+
+    .sort-select:focus { border-color: var(--accent); }
+
+    /* ── STATS ─────────────────────────────────────────────── */
+    .stats-bar {
+      padding: 0 clamp(16px, 5vw, 52px) 14px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .stats-bar strong { color: var(--text); font-weight: 600; }
+
+    /* ── GRID ──────────────────────────────────────────────── */
+    .album-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr));
+      gap: 18px;
+      padding: 0 clamp(16px, 5vw, 52px) 56px;
+    }
+
+    /* ── CARD ──────────────────────────────────────────────── */
+    .album-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      text-decoration: none;
+      color: inherit;
+      position: relative;
+      transition: transform .2s ease, box-shadow .2s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .album-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .album-card:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .card-img-wrap {
+      position: relative;
+      aspect-ratio: 4/3;
+      overflow: hidden;
+      background: var(--border);
+    }
+
+    .card-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform .3s ease;
+    }
+
+    .album-card:hover .card-img { transform: scale(1.04); }
+
+    /* film-keret számozás */
+    .frame-num {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-variant-numeric: tabular-nums;
+      pointer-events: none;
+    }
+
+    /* külső link ikon */
+    .card-ext-icon {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.48);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      color: #fff;
+      border-radius: 7px;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity .2s;
+      pointer-events: none;
+    }
+
+    .album-card:hover .card-ext-icon { opacity: 1; }
+
+    /* placeholder borítókép nélkül */
+    .card-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: linear-gradient(135deg, var(--border) 0%, var(--bg) 100%);
+      color: var(--text-light);
+    }
+
+    .card-placeholder svg { opacity: 0.35; }
+    .card-placeholder span { font-size: 11px; }
+
+    /* ── CARD BODY ─────────────────────────────────────────── */
+    .card-body {
+      padding: 14px 16px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      flex: 1;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 650;
+      line-height: 1.3;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+
+    .card-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 3px;
+    }
+
+    .meta-pill {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--text-light);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ── ÜRES ÁLLAPOT ──────────────────────────────────────── */
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 72px 24px;
+      color: var(--text-muted);
+    }
+
+    .empty-state svg { color: var(--text-light); margin-bottom: 14px; }
+    .empty-state h3 { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 5px; }
+    .empty-state p { font-size: 13px; }
+
+    .empty-clear {
+      margin-top: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 13px;
+      font-family: var(--font);
+      cursor: pointer;
+      transition: background .15s, border-color .15s, color .15s;
+    }
+
+    .empty-clear:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+    /* ── SCROLL TO TOP ─────────────────────────────────────── */
+    .scroll-top-btn {
+      position: fixed;
+      bottom: 22px;
+      right: 22px;
+      width: 40px;
+      height: 40px;
+      border-radius: 11px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.22);
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity .2s, transform .2s;
+      pointer-events: none;
+      z-index: 200;
+    }
+
+    .scroll-top-btn.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    .scroll-top-btn:hover { filter: brightness(1.1); }
+
+    /* ── FOOTER ────────────────────────────────────────────── */
+    footer {
+      text-align: center;
+      padding: 22px 16px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-light);
+      letter-spacing: 0.04em;
+    }
+
+    /* ── RESZPONZÍV ────────────────────────────────────────── */
+    @media (max-width: 560px) {
+      .search-wrap { flex: 1 1 100%; max-width: none; }
+      .sort-select  { flex: 1; }
+      .album-grid   { grid-template-columns: 1fr; gap: 12px; }
+    }
+
+    @media (min-width: 900px) {
+      .album-grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+
+    /* ── SÖTÉT MÓD AUTOMATIKUS (ha nincs manuális toggle) ──── */
+    @media (prefers-color-scheme: dark) {
+      [data-theme="auto"] {
+        --bg:           #111111;
+        --surface:      #1C1C1E;
+        --surface-2:    #242426;
+        --accent:       #D4924A;
+        --accent-soft:  rgba(212, 146, 74, 0.14);
+        --text:         #EDEAE4;
+        --text-muted:   #8C887F;
+        --text-light:   #56524E;
+        --border:       #2C2C2E;
+        --shadow-sm:    0 1px 3px rgba(0,0,0,0.28), 0 1px 2px rgba(0,0,0,0.20);
+        --shadow-md:    0 6px 20px rgba(0,0,0,0.40), 0 2px 6px rgba(0,0,0,0.25);
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- FEJLÉC -->
+<header class="site-header">
+  <div class="header-top">
+    <div>
+      <div class="site-title" id="js-title"></div>
+      <div class="site-subtitle" id="js-subtitle"></div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" id="js-theme-btn" aria-label="Téma váltása" title="Téma váltása">
+        <span id="js-theme-icon">🌙</span>
+      </button>
+    </div>
+  </div>
+  <div class="controls-bar">
+    <div class="search-wrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="search" class="search-input" id="js-search"
+        placeholder="Keresés az albumok között…"
+        aria-label="Album keresése" autocomplete="off">
+    </div>
+    <select class="sort-select" id="js-sort" aria-label="Rendezés">
+      <option value="default">Eredeti sorrend</option>
+      <option value="az">A → Z</option>
+      <option value="za">Z → A</option>
+      <option value="newest">Legújabb elöl</option>
+      <option value="oldest">Legrégebbi elöl</option>
+      <option value="photos">Legtöbb fotó</option>
+    </select>
+  </div>
+</header>
+
+<div class="stats-bar" id="js-stats" aria-live="polite"></div>
+<main class="album-grid" id="js-grid" aria-label="Fotóalbumok"></main>
+
+<button class="scroll-top-btn" id="js-scroll-top" aria-label="Ugrás az oldal tetejére">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+</button>
+
+<footer><span id="js-footer"></span></footer>
+
+<script>
+  /* ============================================================
+     ► KONFIGURÁCIÓ
+     ============================================================ */
+  const CONFIG = {
+    siteTitle:      "Fotóalbumok",
+    siteSubtitle:   "Google Photos · Megosztott albumok",
+    footerText:     "© 2025 · Saját fotógyűjtemény",
+    showDate:       true,
+    showPhotoCount: true,
+  };
+
+  /* ============================================================
+     ► ALBUMOK
+     ============================================================
+     Adj hozzá új albumot az alábbi minta szerint.
+     Kötelező: title, albumUrl
+     Opcionális: description, date, coverUrl, photoCount
+     ============================================================ */
+  const ALBUMS = [
+    {
+      title:       "ERDÉLY (2026)",
+      description: "Egy hét utazás Erdélyben.",
+      date:        "2026. június",
+      coverUrl:    "https://lh3.googleusercontent.com/pw/AP1GczMmz8n1HUH6wriVvhysTylL7cLVd-CYrWx86wby7FHlkUVvwlYehGE6RQmlKTtcy5WK3Is1RbbbDBdxlyl9dd1DWQSSAFCHZwYgCIZMeT78CJS-3ZOkjCHzm0GfvVUb2ZgJBmFk3WqpNjyonCe7RV-W0A=w1211-h908-s-no?authuser=0",
+      albumUrl:    "https://photos.app.goo.gl/xt92F1aNXPF42Xjz7",
+      photoCount:  58,
+    },
+    {
+      title:       "VÁCRÁTÓTI ARBORÉTUM (2026)",
+      description: "Tavaszi látogatás az arborétumban.",
+      date:        "2026. április",
+      coverUrl:    "https://lh3.googleusercontent.com/pw/AP1GczOBDGkJ3z69PndrZMOg2D6CsLOFG98S3ISzxwVoWnS6ZutAL8DaDLAaNyFw-Wt9s4sfLW947Um9fZ0cwL1035mm8kV8_O3F40CEo9jxp0wC0ufTOk_RGwXMp8eTmaxtoELUU3-MoFTLr9LYREdaqXEc-g=w719-h959-s-no?authuser=0",
+      albumUrl:    "https://photos.app.goo.gl/5vchnMrzRJBkzqhYA",
+      photoCount:  12,
+    },
+  ];
+
+  /* ──────────────────────────────────────────────────────────
+     INNENTŐL NEM SZÜKSÉGES SZERKESZTENI
+     ────────────────────────────────────────────────────────── */
+
+  /* ── ÁLLAPOT ── */
+  let searchQ    = "";
+  let sortMode   = "default";
+
+  /* ── TÉMA ── */
+  const root      = document.documentElement;
+  const themeBtn  = document.getElementById("js-theme-btn");
+  const themeIcon = document.getElementById("js-theme-icon");
+
+  const systemDark = () => window.matchMedia("(prefers-color-scheme: dark)").matches;
+  let savedTheme   = localStorage.getItem("photo-theme"); // "light" | "dark" | null
+  applyTheme(savedTheme);
+
+  function applyTheme(t) {
+    savedTheme = t;
+    if (t === "light")  { root.setAttribute("data-theme", "light");  themeIcon.textContent = "🌙"; }
+    else if (t === "dark") { root.setAttribute("data-theme", "dark"); themeIcon.textContent = "☀️"; }
+    else                { root.setAttribute("data-theme", "auto");  themeIcon.textContent = systemDark() ? "☀️" : "🌙"; }
+    if (t) localStorage.setItem("photo-theme", t);
+    else   localStorage.removeItem("photo-theme");
+  }
+
+  themeBtn.addEventListener("click", () => {
+    const cur = root.getAttribute("data-theme");
+    if (cur === "auto")  applyTheme(systemDark() ? "light" : "dark");
+    else if (cur === "dark") applyTheme("light");
+    else applyTheme("dark");
+  });
+
+  /* ── ICON SVG helper ── */
+  const icon = (d, s = 13) =>
+    `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+      aria-hidden="true"><path d="${d}"/></svg>`;
+
+  const D_CAL  = "M8 2v3M16 2v3M3 8h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z";
+  const D_IMG  = "M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h7M3 9l5 3 5-5";
+  const D_EXT  = "M7 17L17 7M17 7H7M17 7v10";
+  const D_CAM  = "M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z";
+  const D_SRCH = "M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z";
+  const D_X    = "M18 6L6 18M6 6l12 12";
+  const D_UP   = "M12 19V5M5 12l7-7 7 7";
+
+  /* ── INIT SZÖVEGEK ── */
+  document.getElementById("js-title").innerHTML =
+    CONFIG.siteTitle.replace(/(\S+)$/, "<em>$1</em>");
+  document.getElementById("js-subtitle").textContent = CONFIG.siteSubtitle;
+  document.getElementById("js-footer").textContent   = CONFIG.footerText;
+
+  /* ── SZŰRÉS + RENDEZÉS ── */
+  function filtered() {
+    let list = [...ALBUMS];
+    if (searchQ) {
+      const q = searchQ.toLowerCase();
+      list = list.filter(a =>
+        a.title.toLowerCase().includes(q) ||
+        (a.description || "").toLowerCase().includes(q)
+      );
+    }
+    if (sortMode === "az")     list.sort((a, b) => a.title.localeCompare(b.title, "hu"));
+    if (sortMode === "za")     list.sort((a, b) => b.title.localeCompare(a.title, "hu"));
+    if (sortMode === "newest") list.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    if (sortMode === "oldest") list.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+    if (sortMode === "photos") list.sort((a, b) => (b.photoCount || 0) - (a.photoCount || 0));
+    return list;
+  }
+
+  /* ── KÁRTYA LÉTREHOZÁSA ── */
+  function makeCard(album, idx) {
+    const a = document.createElement("a");
+    a.className = "album-card";
+    a.href = album.albumUrl;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.setAttribute("aria-label", `${album.title} – album megnyitása Google Photosban`);
+
+    const num = String(idx + 1).padStart(2, "0");
+
+    const imgHtml = album.coverUrl
+      ? `<img class="card-img" src="${album.coverUrl}" alt="${album.title} – borítókép" loading="lazy" decoding="async">`
+      : `<div class="card-placeholder">${icon(D_CAM, 36)}<span>Nincs borítókép</span></div>`;
+
+    const metaItems = [];
+    if (CONFIG.showDate && album.date)
+      metaItems.push(`<span class="meta-pill">${icon(D_CAL)} ${album.date}</span>`);
+    if (CONFIG.showPhotoCount && album.photoCount)
+      metaItems.push(`<span class="meta-pill">${icon(D_IMG)} ${album.photoCount.toLocaleString("hu")} fotó</span>`);
+    const metaHtml = metaItems.length ? `<div class="card-meta">${metaItems.join("")}</div>` : "";
+
+    a.innerHTML = `
+      <div class="card-img-wrap">
+        ${imgHtml}
+        <span class="frame-num" aria-hidden="true">${num}</span>
+        <span class="card-ext-icon" aria-hidden="true">${icon(D_EXT, 14)}</span>
+      </div>
+      <div class="card-body">
+        <div class="card-title">${album.title}</div>
+        ${album.description ? `<div class="card-desc">${album.description}</div>` : ""}
+        ${metaHtml}
+      </div>`;
+    return a;
+  }
+
+  /* ── RENDER ── */
+  function render() {
+    const grid  = document.getElementById("js-grid");
+    const stats = document.getElementById("js-stats");
+    const list  = filtered();
+
+    grid.innerHTML = "";
+
+    if (!list.length) {
+      const el = document.createElement("div");
+      el.className = "empty-state";
+      el.innerHTML = `
+        ${icon(D_SRCH, 48)}
+        <h3>Nincs találat</h3>
+        <p>Próbálj más keresési feltételt!</p>
+        <button class="empty-clear" onclick="clearAll()">
+          ${icon(D_X, 13)} Szűrők törlése
+        </button>`;
+      grid.appendChild(el);
+    } else {
+      list.forEach((a, i) => grid.appendChild(makeCard(a, i)));
+    }
+
+    const total = list.reduce((s, a) => s + (a.photoCount || 0), 0);
+    let txt = `<strong>${list.length}</strong> album`;
+    if (list.length !== ALBUMS.length) txt += ` (összesen: ${ALBUMS.length})`;
+    if (total > 0) txt += ` · <strong>${total.toLocaleString("hu")}</strong> fotó`;
+    stats.innerHTML = txt;
+  }
+
+  function clearAll() {
+    searchQ = ""; sortMode = "default";
+    document.getElementById("js-search").value = "";
+    document.getElementById("js-sort").value   = "default";
+    render();
+  }
+
+  /* ── KERESÉS (debounce) ── */
+  let st;
+  document.getElementById("js-search").addEventListener("input", e => {
+    clearTimeout(st);
+    st = setTimeout(() => { searchQ = e.target.value.trim(); render(); }, 200);
+  });
+
+  /* ── RENDEZÉS ── */
+  document.getElementById("js-sort").addEventListener("change", e => {
+    sortMode = e.target.value; render();
+  });
+
+  /* ── SCROLL TO TOP ── */
+  const scrollBtn = document.getElementById("js-scroll-top");
+  window.addEventListener("scroll", () => {
+    scrollBtn.classList.toggle("visible", window.scrollY > 380);
+  }, { passive: true });
+  scrollBtn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+
+  /* ── INDÍTÁS ── */
+  render();
+</script>
+</body>
+</html>
