@@ -189,26 +189,7 @@
       box-shadow: 0 0 0 3px var(--accent-soft);
     }
 
-    .sort-select {
-      padding: 9px 30px 9px 10px;
-      border: 1px solid var(--border);
-      border-radius: 9px;
-      background: var(--surface);
-      color: var(--text);
-      font-size: 13px;
-      font-family: var(--font);
-      cursor: pointer;
-      outline: none;
-      -webkit-appearance: none;
-      appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 10px center;
-      transition: border-color .15s;
-      white-space: nowrap;
-    }
 
-    .sort-select:focus { border-color: var(--accent); }
 
     /* ── STATS ─────────────────────────────────────────────── */
     .stats-bar {
@@ -487,14 +468,7 @@
         placeholder="Keresés az albumok között…"
         aria-label="Album keresése" autocomplete="off">
     </div>
-    <select class="sort-select" id="js-sort" aria-label="Rendezés">
-      <option value="default">Eredeti sorrend</option>
-      <option value="az">A → Z</option>
-      <option value="za">Z → A</option>
-      <option value="newest">Legújabb elöl</option>
-      <option value="oldest">Legrégebbi elöl</option>
-      <option value="photos">Legtöbb fotó</option>
-    </select>
+
   </div>
 </header>
 
@@ -663,7 +637,6 @@
 
   /* ── ÁLLAPOT ── */
   let searchQ    = "";
-  let sortMode   = "default";
 
   /* ── TÉMA ── */
   const root      = document.documentElement;
@@ -720,11 +693,6 @@
         (a.description || "").toLowerCase().includes(q)
       );
     }
-    if (sortMode === "az")     list.sort((a, b) => a.title.localeCompare(b.title, "hu"));
-    if (sortMode === "za")     list.sort((a, b) => b.title.localeCompare(a.title, "hu"));
-    if (sortMode === "newest") list.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-    if (sortMode === "oldest") list.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-    if (sortMode === "photos") list.sort((a, b) => (b.photoCount || 0) - (a.photoCount || 0));
     return list;
   }
 
@@ -795,9 +763,8 @@
   }
 
   function clearAll() {
-    searchQ = ""; sortMode = "default";
+    searchQ = "";
     document.getElementById("js-search").value = "";
-    document.getElementById("js-sort").value   = "default";
     render();
   }
 
@@ -806,11 +773,6 @@
   document.getElementById("js-search").addEventListener("input", e => {
     clearTimeout(st);
     st = setTimeout(() => { searchQ = e.target.value.trim(); render(); }, 200);
-  });
-
-  /* ── RENDEZÉS ── */
-  document.getElementById("js-sort").addEventListener("change", e => {
-    sortMode = e.target.value; render();
   });
 
   /* ── SCROLL TO TOP ── */
