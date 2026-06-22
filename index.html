@@ -17,6 +17,7 @@
          description – rövid leírás (opcionális)
          date        – dátum szövegként pl. "2024. nyár" (opcionális)
          coverUrl    – borítókép URL (opcionális; ha üres, ikon jelenik meg)
+         country     – ország neve pl. "Olaszország" (opcionális, szűrőgombként jelenik meg)
          photoCount  – fotók száma, manuálisan (opcionális)
 
        BORÍTÓKÉP URL MEGSZERZÉSE GOOGLE PHOTOSBÓL:
@@ -190,6 +191,55 @@
     }
 
 
+
+    /* ── ORSZÁG SZŰRŐK ────────────────────────────────────── */
+    .tag-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 0 clamp(16px, 5vw, 52px) 14px;
+    }
+
+    .tag-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 13px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-muted);
+      font-size: 12px;
+      font-family: var(--font);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .tag-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .tag-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* ország badge a kártyán */
+    .card-country {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 4px;
+      padding: 2px 9px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 500;
+      align-self: flex-start;
+    }
 
     /* ── STATS ─────────────────────────────────────────────── */
     .stats-bar {
@@ -472,6 +522,7 @@
   </div>
 </header>
 
+<div class="tag-filters" id="js-tags" role="group" aria-label="Szűrés ország szerint"></div>
 <div class="stats-bar" id="js-stats" aria-live="polite"></div>
 <main class="album-grid" id="js-grid" aria-label="Fotóalbumok"></main>
 
@@ -498,7 +549,7 @@
      ============================================================
      Adj hozzá új albumot az alábbi minta szerint.
      Kötelező: title, albumUrl
-     Opcionális: description, date, coverUrl, photoCount
+     Opcionális: description, date, coverUrl, country, photoCount
      ============================================================ */
   const ALBUMS = [
     {
@@ -507,6 +558,7 @@
       date:        "2026. június",
       coverUrl:    "https://lh3.googleusercontent.com/pw/AP1GczMmz8n1HUH6wriVvhysTylL7cLVd-CYrWx86wby7FHlkUVvwlYehGE6RQmlKTtcy5WK3Is1RbbbDBdxlyl9dd1DWQSSAFCHZwYgCIZMeT78CJS-3ZOkjCHzm0GfvVUb2ZgJBmFk3WqpNjyonCe7RV-W0A=w1211-h908-s-no?authuser=0",
       albumUrl:    "https://photos.app.goo.gl/xt92F1aNXPF42Xjz7",
+      Country:     "Románia"
       photoCount:  58,
     },
     {
@@ -515,6 +567,7 @@
       date:        "2026. április",
       coverUrl:    "https://lh3.googleusercontent.com/pw/AP1GczOBDGkJ3z69PndrZMOg2D6CsLOFG98S3ISzxwVoWnS6ZutAL8DaDLAaNyFw-Wt9s4sfLW947Um9fZ0cwL1035mm8kV8_O3F40CEo9jxp0wC0ufTOk_RGwXMp8eTmaxtoELUU3-MoFTLr9LYREdaqXEc-g=w719-h959-s-no?authuser=0",
       albumUrl:    "https://photos.app.goo.gl/5vchnMrzRJBkzqhYA",
+      Country:     "Magyarország"
       photoCount:  12,
     },
     {
@@ -636,7 +689,8 @@
      ────────────────────────────────────────────────────────── */
 
   /* ── ÁLLAPOT ── */
-  let searchQ    = "";
+  let activeCountry = null;
+  let searchQ       = "";
 
   /* ── TÉMA ── */
   const root      = document.documentElement;
@@ -683,9 +737,34 @@
   document.getElementById("js-subtitle").textContent = CONFIG.siteSubtitle;
   document.getElementById("js-footer").textContent   = CONFIG.footerText;
 
-  /* ── SZŰRÉS + RENDEZÉS ── */
+  /* ── ORSZÁG SZŰRŐK ── */
+  function allCountries() {
+    const s = new Set();
+    ALBUMS.forEach(a => { if (a.country) s.add(a.country); });
+    return [...s].sort((a, b) => a.localeCompare(b, "hu"));
+  }
+
+  function buildCountryFilters() {
+    const wrap = document.getElementById("js-tags");
+    wrap.innerHTML = "";
+    const countries = allCountries();
+    if (!countries.length) return;
+    [null, ...countries].forEach(c => {
+      const btn = document.createElement("button");
+      btn.className = "tag-btn" + (activeCountry === c ? " active" : "");
+      btn.innerHTML = c ? `🌍 ${c}` : "Összes";
+      btn.addEventListener("click", () => {
+        activeCountry = (activeCountry === c ? null : c);
+        render();
+      });
+      wrap.appendChild(btn);
+    });
+  }
+
+  /* ── SZŰRÉS ── */
   function filtered() {
     let list = [...ALBUMS];
+    if (activeCountry) list = list.filter(a => a.country === activeCountry);
     if (searchQ) {
       const q = searchQ.toLowerCase();
       list = list.filter(a =>
@@ -728,12 +807,14 @@
         <div class="card-title">${album.title}</div>
         ${album.description ? `<div class="card-desc">${album.description}</div>` : ""}
         ${metaHtml}
+        ${album.country ? `<span class="card-country">🌍 ${album.country}</span>` : ""}
       </div>`;
     return a;
   }
 
   /* ── RENDER ── */
   function render() {
+    buildCountryFilters();
     const grid  = document.getElementById("js-grid");
     const stats = document.getElementById("js-stats");
     const list  = filtered();
@@ -763,6 +844,7 @@
   }
 
   function clearAll() {
+    activeCountry = null;
     searchQ = "";
     document.getElementById("js-search").value = "";
     render();
