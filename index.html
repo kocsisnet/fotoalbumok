@@ -1137,11 +1137,16 @@
       list.forEach((a, i) => grid.appendChild(makeCard(a, i)));
     }
 
-    const total = list.reduce((s, a) => s + (a.photoCount || 0), 0);
-    let txt = `<strong>${list.length}</strong> album`;
-    if (list.length !== ALBUMS.length) txt += ` (összesen: ${ALBUMS.length})`;
-    if (total > 0) txt += ` · <strong>${total.toLocaleString("hu")}</strong> fotó`;
-    stats.innerHTML = txt;
+    const total      = list.reduce((s, a) => s + (a.photoCount || 0), 0);
+    const countries  = new Set(list.flatMap(a => a.country || []));
+    const isFiltered = list.length !== ALBUMS.length;
+
+    const parts = [];
+    if (countries.size > 0) parts.push(`<strong>${countries.size}</strong> ország`);
+    parts.push(`<strong>${list.length}</strong> album${isFiltered ? ` (összesen: ${ALBUMS.length})` : ""}`);
+    if (total > 0) parts.push(`<strong>${total.toLocaleString("hu")}</strong> fotó`);
+
+    stats.innerHTML = parts.join(" · ");
   }
 
   function clearAll() {
