@@ -18,6 +18,7 @@
          date        – dátum szövegként pl. "2024. nyár" (opcionális)
          coverUrl    – borítókép URL (opcionális; ha üres, ikon jelenik meg)
          country     – ország/ok tömbként pl. ["Olaszország"] vagy ["Ausztria","Olaszország"]
+         videoUrl    – YouTube videó linkje (opcionális, YT gomb jelenik meg a kártyán)
          photoCount  – fotók száma, manuálisan (opcionális)
 
        BORÍTÓKÉP URL MEGSZERZÉSE GOOGLE PHOTOSBÓL:
@@ -397,6 +398,27 @@
       font-variant-numeric: tabular-nums;
     }
 
+    /* YouTube gomb */
+    .yt-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 11px;
+      border-radius: 7px;
+      background: #FF0000;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: var(--font);
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      transition: background .15s, transform .1s;
+      align-self: flex-start;
+    }
+
+    .yt-btn:hover { background: #CC0000; transform: scale(1.03); }
+
     /* ── ÜRES ÁLLAPOT ──────────────────────────────────────── */
     .empty-state {
       grid-column: 1 / -1;
@@ -558,6 +580,7 @@
       date:        "2026. június",
       coverUrl:    "https://lh3.googleusercontent.com/pw/AP1GczMmz8n1HUH6wriVvhysTylL7cLVd-CYrWx86wby7FHlkUVvwlYehGE6RQmlKTtcy5WK3Is1RbbbDBdxlyl9dd1DWQSSAFCHZwYgCIZMeT78CJS-3ZOkjCHzm0GfvVUb2ZgJBmFk3WqpNjyonCe7RV-W0A=w1211-h908-s-no?authuser=0",
       albumUrl:    "https://photos.app.goo.gl/xt92F1aNXPF42Xjz7",
+      videoUrl:    "https://youtu.be/TChRV44aS1A",
       country:     ["Románia"],
       photoCount:  58,
     },
@@ -657,6 +680,7 @@
       date:        "2023. október",
       coverUrl:    "https://lh3.googleusercontent.com/pw/AP1GczMt8YIQM12A7JeP2AElPABcPVo6qyk6kXftcq-3oK4vSInHqPDNUdYGrZWkm41CZR6-M6K8nZeEuZvHiLRntmdNYci2_Ymcyh8GCE3XwUNDRyiI7LcALr-s_zpArab4X3irlaBVXE6FD9MLfz9UzlRbnw=w719-h959-s-no?authuser=0",
       albumUrl:    "https://photos.app.goo.gl/RgvgibFTVSbjRY9U6",
+      videoUrl:    "https://youtu.be/nQaVeCP-r50",
       country:     ["Portugália"],
       photoCount:  89,
     },
@@ -989,6 +1013,7 @@
       stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
       aria-hidden="true"><path d="${d}"/></svg>`;
 
+  const YT_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg>`;
   const D_CAL  = "M8 2v3M16 2v3M3 8h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z";
   const D_IMG  = "M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h7M3 9l5 3 5-5";
   const D_EXT  = "M7 17L17 7M17 7H7M17 7v10";
@@ -1073,9 +1098,17 @@
         <div class="card-title">${album.title}</div>
         ${album.description ? `<div class="card-desc">${album.description}</div>` : ""}
         ${metaHtml}
-        ${album.country && album.country.length
-            ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${album.country.map(c => `<span class="card-country">🌍 ${c}</span>`).join("")}</div>`
+        ${(album.country?.length || album.videoUrl) ? `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px">
+          <div style="display:flex;flex-wrap:wrap;gap:4px">
+            ${(album.country || []).map(c => `<span class="card-country">🌍 ${c}</span>`).join("")}
+          </div>
+          ${album.videoUrl
+            ? `<a class="yt-btn" href="${album.videoUrl}" target="_blank" rel="noopener noreferrer"
+                aria-label="Videó megtekintése YouTube-on"
+                onclick="event.stopPropagation()">${YT_ICON} Videó</a>`
             : ""}
+        </div>` : ""}
       </div>`;
     return a;
   }
